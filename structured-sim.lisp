@@ -18,9 +18,17 @@
   (with-clog-create body
       (div (:style +flex-row+)
 
-
            (div (:style (styles +flex-top-col+ "margin-right:10%;"))
                 (p (:content "Create Tags Here"))
+                (div (:style "width:100%;" :class "w3-white w3-container")
+                     (table (:class "w3-table")
+                            (table-body ()
+                                        (table-row ()
+                                                   (table-heading (:content "Tag Name"))
+                                                   (table-heading (:content "Tag Type")))
+                                        (table-row ()
+                                                   (table-column (:content "bMotor"))
+                                                   (table-column (:content "Bool"))))))
                 (form (:bind f1)
                       (select (:bind selobj :label (create-label f1 :content "Tag Type: ")))
                       (br ())
@@ -46,15 +54,17 @@
     (load-script (html-document body)
                  "https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js")
 
-    (setf (style editor-div "height") "800px")
+    (setf (style editor-div "height") "500px")
     (setf (style editor-div "width") "100%")
     (setf (style editor-div "border") "1px solid #ccc")
     (js-execute body
-                "setTimeout(function() {
+                (format nil
+                   "setTimeout(function() {
                    var editor = ace.edit('editor');
                    editor.setTheme('ace/theme/github');
                    editor.session.setMode('ace/mode/pascal');
                    editor.setFontSize(14);
+                   editor.setValue('~a');
                    editor.setOptions({
                      showLineNumbers: true,
                      showGutter: true,
@@ -62,5 +72,12 @@
                    });
 
                    window.clogEditor = editor;
-                 }, 100);")
+                 }, 100);" (escape-js-string (nth (random (length *code-samples*)) *code-samples*))))
     editor-div))
+
+(defun escape-js-string (str)
+  (str:replace-all
+   "'" "\\'"
+   (str:replace-all
+    (string #\Newline) "\\n"
+    (str:replace-all "\\" "\\\\" str))))
