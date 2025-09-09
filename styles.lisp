@@ -6,11 +6,7 @@
   :test #'string=)
 
 (alexandria:define-constant +flex-row+
-  "display:flex;flex-direction:row;justify-content:center;align-items:center;"
-  :test #'string=)
-
-(alexandria:define-constant +flex-top-col+
-  "display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;"
+  "display:flex;flex-direction:row;justify-content:flex-start;align-items:flex-start;"
   :test #'string=)
 
 (defparameter *line-nums*
