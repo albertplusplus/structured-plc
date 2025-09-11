@@ -74,10 +74,20 @@
 
 (defun lex-open-paren (code)
   (read-char code nil nil)
-  (if (eql (peek code) #\*)))
+  (if (eql (peek code) #\*)
+      (lex-block-comment code)
+      (list :open-paren "(")))
 
 (defun lex-block-comment (code)
-  ())
+  (read-char code nil nil)
+  (let ((last-peek nil))
+    (loop while (peek code) do
+      (if (and (eql last-peek #\*)
+               (eql (peek code) #\)))
+          (progn
+            (read-char code nil nil)
+            (return (list :block-comment "")))
+          (setf last-peek (read-char code nil nil))))))
 
 (defun lex-string (code delim)
   (read-char code nil nil)
