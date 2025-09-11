@@ -10,4 +10,5 @@
   :components ((:file "package")
                (:file "styles")
                (:file "code-samples")
+               (:file "lexer")
                (:file "structured-sim")))
