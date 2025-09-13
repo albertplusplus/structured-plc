@@ -41,6 +41,7 @@
                 ((eql ch #\/) (push (lex-slash code) tokens))
                 ((eql ch #\() (push (lex-open-paren code) tokens))
                 ((eql ch #\>) (push (lex-greater-angle code) tokens))
+                ((eql ch #\+) (read-char code nil nil) (push (list :op "+") tokens))
                 (t (read-char code nil nil)))))
     (nreverse tokens)))
 
