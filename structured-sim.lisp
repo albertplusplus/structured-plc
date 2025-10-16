@@ -9,8 +9,8 @@
 
 (defun on-new-window (body)
   (let ((running nil)
-        (stopped t)
         (tags nil)
+        (stopped t)
         (code nil))
     (clog-web:clog-web-initialize body)
     (setf (title (html-document body)) "Structured Sim")
@@ -62,7 +62,8 @@
 
       (flet ((start-running (obj)
                (setf (background-color stop-button) "#ccc")
-               (setf (background-color run-button) "green"))
+               (setf (background-color run-button) "green")
+               (format t "~A~%" (lex (js-query body "window.clogEditor.getValue()"))))
              (stop-running (obj)
                (setf (background-color stop-button) "orange")
                (setf (background-color run-button) "#ccc")))
