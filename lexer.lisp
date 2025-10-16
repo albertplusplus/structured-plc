@@ -3,9 +3,7 @@
 (in-package :structured-sim)
 
 
-(defparameter *tokens* nil)
-
-(defvar *reserved-table* (alexandria:alist-hash-table
+(defparameter *reserved-table* (alexandria:alist-hash-table
                           '(("if"      . :if)
                             ("then"    . :then)
                             ("end_if"  . :end-if)
@@ -18,21 +16,7 @@
                             ("false"   . :false)
                             ("case" . :case)
                             ("of" . :of)
-                            ("end_case" . :end-case))))
-
-
-(defvar *reserved* (list "true" "false" "if" "then" "for" "by" "do" "to" "end_if" "end_for"))
-
-(defstruct token
-  type
-  lexeme
-  col)
-
-(defun new-token (tp le co)
-  (make-token :type tp :lexeme le :col co))
-
-(defun read-ch (curr)
-  (incf curr))
+                            ("end_case" . :end-case)) :test #'equal))
 
 (defun lex (code-to-lex)
   (let ((curr-line 0)
@@ -57,6 +41,7 @@
                 ((eql ch #\/) (push (lex-slash code) tokens))
                 ((eql ch #\() (push (lex-open-paren code) tokens))
                 ((eql ch #\>) (push (lex-greater-angle code) tokens))
+                ((eql ch #\+) (read-char code nil nil) (push (list :op "+") tokens))
                 (t (read-char code nil nil)))))
     (nreverse tokens)))
 
@@ -73,12 +58,14 @@
       (list :division "/")))
 
 (defun lex-open-paren (code)
+  "Lex an open paren. If followed by asterisk, it is a block comment."
   (read-char code nil nil)
   (if (eql (peek code) #\*)
       (lex-block-comment code)
       (list :open-paren "(")))
 
 (defun lex-block-comment (code)
+  "An open paren followed by asterisk is a block comment."
   (read-char code nil nil)
   (let ((last-peek nil))
     (loop while (peek code) do
@@ -90,6 +77,7 @@
           (setf last-peek (read-char code nil nil))))))
 
 (defun lex-string (code delim)
+  "Lex a string, which is text inside of single or double quotes (#\' or #\")"
   (read-char code nil nil)
   (let ((fstr (make-array '(0) :element-type 'base-char :fill-pointer 0 :adjustable t)))
     (with-output-to-string (s fstr)
@@ -99,6 +87,7 @@
     (list :string fstr))))
 
 (defun lex-assign (code)
+  "Lex an assignment, which is a colon followed by equal sign :="
   (read-char code nil nil)
   (let ((next (peek code)))
     (cond
@@ -106,13 +95,13 @@
       (t (list :undefined ":")))))
 
 (defun lex-equal (code)
+  "Lex an equal sign, which is used for comparison"
   (read-char code nil nil)
-  (let ((next (peek code)))
-    (cond
-      ((eql next #\=) (read-char code nil nil) (list :comparison "=="))
-      (t (list :undefined "=")))))
+  (list :comparison "="))
 
 (defun lex-less-angle (code)
+  "Lex a left angle, which can either be less than (<), less than or equal to (<=),
+   or not equal to (<>)."
   (read-char code nil nil)
   (let ((next (peek code)))
     (cond
@@ -121,6 +110,7 @@
       (t (list :less-than "<")))))
 
 (defun lex-greater-angle (code)
+  "Lex a right angle, which can be greater than (>) or greater than or equal to (>=)"
   (read-char code nil nil)
   (let ((next (peek code)))
     (cond
@@ -129,15 +119,19 @@
 
 
 (defun lex-ident (code)
+  "Lex an identifier, which is a stream of alphanumeric characters and/or underscores,
+   but must start with an alpha character."
   (let* ((tmp (lex-token code :token-key :ident :stop-pred #'(lambda (x) (or (alpha-char-p x) (eql x #\_)))))
          (ident-str (str:downcase tmp))
          (is-reserved (gethash ident-str *reserved-table*)))
     (if is-reserved
-        (list (intern (str:upcase ident-str) :keyword) tmp)
+        (list is-reserved tmp)
         (list :ident tmp))))
 
 
 (defun lex-num (code)
+  "Lex a number, which is a collection of digits, which may have a decimal (.),
+   making it a real"
   (let ((fstr (make-array '(0) :element-type 'base-char :fill-pointer 0 :adjustable t))
         (is-real nil))
     (with-output-to-string (s fstr)

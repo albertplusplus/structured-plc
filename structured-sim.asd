@@ -11,4 +11,5 @@
                (:file "styles")
                (:file "code-samples")
                (:file "lexer")
+               (:file "parser")
                (:file "structured-sim")))
