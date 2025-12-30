@@ -2,6 +2,12 @@
 
 (in-package :structured-sim)
 
+(defparameter *lex-symbols*
+  '(:if :then :end-if :for :by :do :to :end-for :true :false :case :of :end-case
+    :newline :semicolon :comments :division :open-paren :close-paren :string
+    :assign :undefined :comparison :less-equal :not-equal :less-than
+    :greater-equal :greater :ident :real :int))
+
 
 (defparameter *reserved-table* (alexandria:alist-hash-table
                           '(("if"      . :if)
