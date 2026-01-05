@@ -13,4 +13,5 @@
 ;;; the simulator.
 ;;;
 ;;; I will do this by, instead of the setf s-expr above, i will turn it into
-;;;   (setf ())
+;;;   (setf (text-value html-element) "True")
+;;; So we can be visually changing the value of the data in HTML
