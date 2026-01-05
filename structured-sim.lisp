@@ -69,7 +69,8 @@
                        (button (:bind run-button
                                  :style "background-color:#ccc;"
                                  :content "Run")))
-                       (text-area (:rows 30 :columns 20 :value "Debug info" :style "margin-left:3px;")))))
+                       (text-area (:bind debug-text-area :rows 25 :columns 25 :value "Debug info" :style "margin-left:3px;"))))
+             (div (:style "height:10vh")))
 
 
       (flet ((start-running (obj)
@@ -81,7 +82,23 @@
                (setf (background-color run-button) "#ccc"))
              (add-tags (tag)
              ;  (with-clog-create tablebody
-                   (create-string-tag tablebody :content tag)))
+               (cond
+                 ((string= (second tag) "Bool")
+                  (create-string-tag tablebody :content tag))
+                 ((string= (second tag) "Int")
+                  (create-string-tag tablebody :content tag))
+                 ((string= (second tag) "Real")
+                  (create-string-tag tablebody :content tag))
+                 ((string= (second tag) "String")
+                  (create-string-tag tablebody :content tag))
+                 ((string= (second tag) "ArrayBool")
+                  (create-string-tag tablebody :content tag))
+                 ((string= (second tag) "ArrayInt")
+                  (create-string-tag tablebody :content tag))
+                 ((string= (second tag) "ArrayInt")
+                  (create-string-tag tablebody :content tag))
+                 (t (error "Datatype Not Supported")))))
+                  ;(create-string-tag tablebody :content tag)))
                    ;(table-row (:bind tag-row)
                               ;(table-column (:content (first tag)))
                               ;(table-column (:content (second tag)))
@@ -92,6 +109,7 @@
                 ; (set-on-click del-button (lambda (x) (destroy tag-row))))))
         (loop for tag in vars do
               (add-tags tag))
+        (disable-resize debug-text-area)
         (set-on-click stop-button #'stop-running)
         (set-on-click run-button #'start-running)
         (set-on-click add-button
@@ -132,7 +150,7 @@
     (load-script (html-document body)
                  "https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js")
 
-    (setf (style editor-div "height") "500px")
+    (setf (style editor-div "height") "600px")
     (setf (style editor-div "width") "100%")
     (setf (style editor-div "border") "1px solid #ccc")
     (js-execute body
