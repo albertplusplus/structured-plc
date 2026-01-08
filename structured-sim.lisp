@@ -2,13 +2,40 @@
 
 (in-package #:structured-sim)
 
+(defparameter +foreground+ "w3-light-blue")
+(defparameter +background+ "w3-blue-grey")
+(defparameter +foregound-border+ "w3-border-light-blue")
+
 
 (defun styles (&rest args)
   (apply #'str:concat args))
 
+(defun on-about (body)
+  (clog-web-initialize body)
+  (add-class body +background+)
+  (let* ((menu (create-web-menu-bar body))
+         (sim (create-web-menu-item menu :content "Simulator" :link "/"))
+         (about (create-web-menu-item menu :content "About Me" :link "/about"))
+         (_div (create-div body :class (format nil "~A ~A" "w3-panel" +foreground+)
+                     :style +flex-col+
+                     :content (spinneret:with-html-string (:h1 "About Me"))))
+         (about-div (create-div body :style "display:flex;flex-direction:column;width:80%;align-items:center;")))
+    (create-div about-div :style "align-items:left;width:90%;"
+                          :content (spinneret:with-html-string
+                                     (:h1 (:u "Who Am I"))
+                                     (:p "My name is Albert Bear. I work as an Automation Engineer at Amazon. Previously I worked at Siemens where
+                                          I was a Manufacturing Systems Engineer.")
+                                     (:h1 (:u "Contacting Me"))
+                                     (:p "Feel free to contact me on " (:a :href "https://www.linkedin.com" "LinkedIn") "or on email at " (:u "albertbear94@gmail.com"))))))
+
 
 (defun on-new-window (body)
-  (let* ((running nil)
+ (clog-web-initialize body)
+  (let* ((menu (create-web-menu-bar body))
+         (sim (create-web-menu-item menu :content "Simulator" :link "/"))
+         (about (create-web-menu-item menu :content "About Me" :link "/about"))
+
+         (running nil)
          (tags nil)
          (stopped t)
          (code nil)
@@ -17,11 +44,11 @@
          (vars (cdr (assoc 'tags sample))))
     (clog-web:clog-web-initialize body)
     (setf (title (html-document body)) "Structured Sim")
-    (add-class body "w3-blue-grey")
-    (create-div body :class "w3-panel w3-light-blue"
+    (add-class body +background+)
+    (create-div body :class (format nil "~A ~A" "w3-panel" +foreground+)
                      :style +flex-col+
                      :content (spinneret:with-html-string
-                                (:h1 "PLC Simulator Using Structured Text (SCL)")))
+                                (:h1 "PLC Simulator Using Structured Text")))
     (with-clog-create body
         (div (:style +flex-col+)
 
@@ -30,7 +57,7 @@
                   (div (:style (styles +flex-row+ "width:100%;margin-top:0px;justify-content:flex-start;margin-bottom:30px;") :class "w3-container")
                        (table (:style "width:100%;" :class "w3-table w3-border w3-bordered")
                               (table-body (:bind tablebody)
-                                          (table-row (:class "w3-light-blue")
+                                          (table-row (:class +foreground+)
                                                      (table-heading (:content "Tag Name"))
                                                      (table-heading (:content "Tag Type"))
                                                      (table-heading (:content "Value"))
@@ -53,7 +80,7 @@
 
              ;(div (:class "w3-panel w3-grey"))
 
-             (div (:style (styles +flex-row+ "width:80%;height:100%;"))
+             (div (:class (format nil "~A ~A" "w3-border w3-round" +foregound-border+) :style (styles +flex-row+ "width:80%;height:100%;border-width: 3px !important;border"))
 
                   (div (:bind editor-d :style (styles +flex-col+ "flex:1;width:50%;height:100%;")))
 
@@ -61,25 +88,29 @@
                       ;      (button (:bind stop-button :style "background-color:orange;" :content "Stop"))
                        ;     (button (:bind run-button :style "background-color:#ccc;" :content "Run"))))
                   (div (:style (styles +flex-col+ "height:100%;margin-left:auto;"))
-
-                  (div (:style (styles +flex-row+ "gap:10px;"))
-                       (button (:bind stop-button
-                                 :style "background-color:orange;"
-                                 :content "Stop"))
-                       (button (:bind run-button
-                                 :style "background-color:#ccc;"
-                                 :content "Run")))
-                       (text-area (:bind debug-text-area :rows 25 :columns 25 :value "Debug info" :style "margin-left:3px;"))))
+                       (div (:style (styles +flex-row+ "gap:10px;width:100%;margin-left:3px;"))
+                            (button (:bind stop-button
+                                      :style "background-color:orange;"
+                                      :content "Stop"))
+                            (button (:bind run-button
+                                      :style "background-color:#ccc;"
+                                      :content "Run")))
+                       (text-area (:bind debug-text-area :rows 25 :columns 25 :value (format nil "Debug info will be printed here~%") :style "margin-left:3px;"))))
              (div (:style "height:10vh")))
 
 
       (flet ((start-running (obj)
-               (setf (background-color stop-button) "#ccc")
-               (setf (background-color run-button) "green")
-               (format t "~A~%" (lex (js-query body "window.clogEditor.getValue()"))))
+               (when stopped
+                 (setf (background-color stop-button) "#ccc")
+                 (setf (background-color run-button) "green")
+                 (setf stopped nil)
+                 (print-to-debug debug-text-area "Simulation Started")
+                 (format t "~A~%" (lex (js-query body "window.clogEditor.getValue()")))))
              (stop-running (obj)
+               (setf stopped t)
                (setf (background-color stop-button) "orange")
-               (setf (background-color run-button) "#ccc"))
+               (setf (background-color run-button) "#ccc")
+               (print-to-debug debug-text-area "Simulation Stopped"))
              (add-tags (tag)
              ;  (with-clog-create tablebody
                (cond
@@ -142,7 +173,8 @@
 
 
 (defun start-app ()
-  (initialize 'on-new-window))
+  (initialize 'on-new-window)
+  (set-on-new-window 'on-about :path "/about"))
 
 
 (defun create-code-editor (body container-div code)
@@ -170,6 +202,11 @@
                    window.clogEditor = editor;
                  }, 100);" (escape-js-string code)))
     editor-div))
+
+(defun print-to-debug (dbug line)
+  (let ((txt (text-value dbug)))
+    (setf (text-value dbug)
+          (concatenate 'string txt (format nil "~A~%" line)))))
 
 (defun escape-js-string (str)
   (str:replace-all
