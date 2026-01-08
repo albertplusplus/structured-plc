@@ -2,10 +2,20 @@
 
 (in-package #:structured-sim)
 
-(defparameter +foreground+ "w3-light-blue")
+(defparameter +foregounrd+ "w3-teal")
 (defparameter +background+ "w3-blue-grey")
 (defparameter +foregound-border+ "w3-border-light-blue")
+(defparameter +light-blue+ "#DCE2F0")
+(defparameter +grey+ "#50586C")
 
+(defun add-semicolon (s)
+  (format nil "~A~A" s (if (str:ends-with? ";" s) "" ";")))
+
+(defun back-color (col)
+  (add-semicolon (format nil "background-color: ~A" col)))
+
+(defun fore-color (col)
+  (add-semicolon (format nil "color: ~A" col)))
 
 (defun styles (&rest args)
   (apply #'str:concat args))
@@ -44,11 +54,12 @@
          (vars (cdr (assoc 'tags sample))))
     (clog-web:clog-web-initialize body)
     (setf (title (html-document body)) "Structured Sim")
-    (add-class body +background+)
-    (create-div body :class (format nil "~A ~A" "w3-panel" +foreground+)
-                     :style +flex-col+
+   ; (add-class body +background+)
+    (setf (style body "background-color") +light-blue+)
+    (create-div body :class  "w3-panel"
+                     :style (styles +flex-col+ (back-color +grey+))
                      :content (spinneret:with-html-string
-                                (:h1 "PLC Simulator Using Structured Text")))
+                                (:h1 :style (fore-color +light-blue+) "PLC Simulator Using Structured Text")))
     (with-clog-create body
         (div (:style +flex-col+)
 
@@ -57,7 +68,7 @@
                   (div (:style (styles +flex-row+ "width:100%;margin-top:0px;justify-content:flex-start;margin-bottom:30px;") :class "w3-container")
                        (table (:style "width:100%;" :class "w3-table w3-border w3-bordered")
                               (table-body (:bind tablebody)
-                                          (table-row (:class +foreground+)
+                                          (table-row (:class "w3-border" :style (back-color +grey+))
                                                      (table-heading (:content "Tag Name"))
                                                      (table-heading (:content "Tag Type"))
                                                      (table-heading (:content "Value"))
@@ -80,7 +91,7 @@
 
              ;(div (:class "w3-panel w3-grey"))
 
-             (div (:class (format nil "~A ~A" "w3-border w3-round" +foregound-border+) :style (styles +flex-row+ "width:80%;height:100%;border-width: 3px !important;border"))
+             (div (:class "w3-border w3-round" :style (styles +flex-row+ "width:80%;height:100%;border-width: 3px !important;" (format nil "border-color:~A !important;" +grey+)))
 
                   (div (:bind editor-d :style (styles +flex-col+ "flex:1;width:50%;height:100%;")))
 
@@ -90,10 +101,10 @@
                   (div (:style (styles +flex-col+ "height:100%;margin-left:auto;"))
                        (div (:style (styles +flex-row+ "gap:10px;width:100%;margin-left:3px;"))
                             (button (:bind stop-button
-                                      :style "background-color:orange;"
+                                      :style "background-color:orange;width:30%;"
                                       :content "Stop"))
                             (button (:bind run-button
-                                      :style "background-color:#ccc;"
+                                      :style "background-color:#ccc;width:30%;"
                                       :content "Run")))
                        (text-area (:bind debug-text-area :rows 25 :columns 25 :value (format nil "Debug info will be printed here~%") :style "margin-left:3px;"))))
              (div (:style "height:10vh")))
