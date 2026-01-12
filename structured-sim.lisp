@@ -116,7 +116,7 @@
                  (setf (background-color run-button) "green")
                  (setf stopped nil)
                  (print-to-debug debug-text-area "Simulation Started")
-                 (format t "~A~%" (lex (js-query body "window.clogEditor.getValue()")))))
+                 (format t "~A~%" (tokenize (js-query body "window.clogEditor.getValue()")))))
              (stop-running (obj)
                (setf stopped t)
                (setf (background-color stop-button) "orange")
