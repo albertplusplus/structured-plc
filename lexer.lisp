@@ -2,166 +2,201 @@
 
 (in-package :structured-sim)
 
-(defparameter *lex-symbols*
-  '(:if :then :end-if :for :by :do :to :end-for :true :false :case :of :end-case
-    :newline :semicolon :comments :division :open-paren :close-paren :string
-    :assign :undefined :comparison :less-equal :not-equal :less-than
-    :greater-equal :greater :ident :real :int))
+(defstruct token
+  type
+  value
+  line
+  column)
 
+(defstruct lexer-state
+  stream
+  line
+  column
+  current-char)
 
-(defparameter *reserved-table* (alexandria:alist-hash-table
-                          '(("if"      . :if)
-                            ("then"    . :then)
-                            ("end_if"  . :end-if)
-                            ("for"     . :for)
-                            ("by"      . :by)
-                            ("do"      . :do)
-                            ("to"      . :to)
-                            ("end_for" . :end-for)
-                            ("true"    . :true)
-                            ("false"   . :false)
-                            ("case" . :case)
-                            ("of" . :of)
-                            ("end_case" . :end-case)) :test #'equal))
+(defun make-lexer (input-string)
+  (let ((stream (make-string-input-stream input-string)))
+    (make-lexer-state :stream stream
+                      :line 1
+                      :column 0
+                      :current-char (read-char stream nil nil))))
 
-(defun lex (code-to-lex)
-  (let ((curr-line 0)
+(defun advance (lexer)
+  (let ((ch (lexer-state-current-char lexer)))
+    (when ch
+      (when (char= ch #\Newline)
+        (incf (lexer-state-line lexer))
+        (setf (lexer-state-column lexer) 0))
+      (incf (lexer-state-column lexer))
+      (setf (lexer-state-current-char lexer)
+            (read-char (lexer-state-stream lexer) nil nil)))))
+
+(defun peek-char-lexer (lexer)
+  (lexer-state-current-char lexer))
+
+(defun make-token-here (lexer type value)
+  (make-token :type type
+              :value value
+              :line (lexer-state-line lexer)
+              :column (lexer-state-column lexer)))
+
+(defun whitespace-p (ch)
+  (and ch (member ch '(#\Space #\Tab))))
+
+(defun newline-p (ch)
+  (and ch (member ch '(#\Newline))))
+
+(defun skip-whitespace (lexer)
+  (loop while (whitespace-p (peek-char-lexer lexer))
+        do (advance lexer)))
+
+(defun lex-identifier (lexer)
+  (let ((start-line (lexer-state-line lexer))
+        (start-col (lexer-state-column lexer))
+        (chars nil))
+    (loop for ch = (peek-char-lexer lexer)
+          while (and ch (or (alpha-char-p ch)
+                            (digit-char-p ch)
+                            (char= ch #\_)))
+          do (progn
+               (advance lexer)
+               (push ch chars)))
+    (let* ((text (coerce (nreverse chars) 'string))
+           (text-upper (string-upcase text))
+           (keyword-type (cond
+                           ((string= text-upper "IF") :if)
+                           ((string= text-upper "THEN") :then)
+                           ((string= text-upper "END_IF") :end-if)
+                           ((string= text-upper "FOR") :for)
+                           ((string= text-upper "TO") :to)
+                           ((string= text-upper "BY") :by)
+                           ((string= text-upper "TRUE") :true)
+                           ((string= text-upper "FALSE") :false)
+                           ((string= text-upper "CASE") :case)
+                           ((string= text-upper "END_CASE") :end-case)
+                           (t :ident))))
+      (make-token :type keyword-type
+                  :value text
+                  :line start-line
+                  :column start-col))))
+
+(defun peek-next-char (lexer)
+  (let ((stream (lexer-state-stream lexer)))
+    (peek-char nil stream nil nil)))
+
+(defun lex-number (lexer)
+  (let ((start-line (lexer-state-line lexer))
+        (start-col (lexer-state-column lexer))
+        (chars nil)
+        (has-dot nil))
+    (loop for ch = (peek-char-lexer lexer)
+          while (and ch (digit-char-p ch))
+          do (progn
+               (advance lexer)
+               (push ch chars)))
+    (when (and (eql (peek-char-lexer lexer) #\.)
+               (and (peek-next-char lexer) (digit-char-p (peek-next-char lexer))))
+      (setf has-dot t)
+      (push (advance lexer) chars)
+      (loop for ch = (peek-char-lexer lexer)
+            while (and ch (digit-char-p ch))
+            do (progn
+                 (advance lexer)
+                 (push ch chars))))
+    (let ((text (coerce (nreverse chars) 'string)))
+      (make-token :type (if has-dot :real :int)
+                  :value text
+                  :line start-line
+                  :column start-col))))
+
+(defun lex-string (lexer quote-char)
+  (let ((start-line (lexer-state-line lexer))
+        (start-col (lexer-state-column lexer))
+        (chars nil))
+    (advance lexer)
+    (loop for ch = (peek-char-lexer lexer)
+          until (or (null ch) (char= ch quote-char))
+          do (progn
+               (advance lexer)
+               (push ch chars)))
+    (unless (peek-char-lexer lexer)
+      (error "Unterminated string at line"))
+    (advance lexer)
+    (make-token :type :string
+                :value (coerce (nreverse chars) 'string)
+                :line start-line
+                :column start-col)))
+
+(defun lex-next-token (lexer)
+  (skip-whitespace lexer)
+  (let ((ch (peek-char-lexer lexer)))
+    (cond
+      ((null ch) nil)
+
+      ((newline-p ch)
+       (let ((tok (make-token-here lexer :newline "\\n")))
+         (advance lexer)
+         tok))
+
+      ((alpha-char-p ch)
+       (lex-identifier lexer))
+
+      ((digit-char-p ch)
+       (lex-number lexer))
+
+      ((or (char= ch #\") (char= ch #\'))
+       (lex-string lexer ch))
+
+      ((char= ch #\;)
+       (advance lexer)
+       (make-token-here lexer :semicolon ";"))
+
+      ((char= ch #\()
+       (advance lexer)
+       (make-token-here lexer :open-paren "("))
+
+      ((char= ch #\))
+       (advance lexer)
+       (make-token-here lexer :close-paren ")"))
+
+      ((char= ch #\[)
+       (advance lexer)
+       (make-token-here lexer :open-bracket "["))
+
+      ((char= ch #\])
+       (advance lexer)
+       (make-token-here lexer :close-bracket "]"))
+
+      ((char= ch #\/)
+       (advance lexer)
+       (if (eql (peek-char-lexer lexer) #\/)
+           (progn
+             (loop while (let ((c (peek-char-lexer lexer)))
+                           (and c (not (newline-p c))))
+                   do (advance lexer))
+             (make-token-here lexer :comment "//"))
+           (make-token-here lexer :division "/")))
+
+      ((char= ch #\:)
+       (advance lexer)
+       (if (eql (peek-char-lexer lexer) #\=)
+           (progn (advance lexer)
+                  (make-token-here lexer :assign ":="))
+           (make-token-here lexer :colon ":")))
+
+      ((char= ch #\+)
+       (advance lexer)
+       (make-token-here lexer :op "+"))
+
+      (t
+       (let ((tok (make-token-here lexer :undefined (string ch))))
+         (advance lexer)
+         tok)))))
+
+(defun tokenize (input-string)
+  (let ((lexer (make-lexer input-string))
         (tokens nil))
-    (with-input-from-string (code code-to-lex)
-      (loop for ch = (peek code) then (peek code)
-            until (null ch) do
-              (cond
-                ((alpha-char-p ch) (push (lex-ident code) tokens))
-                ((alphanumericp ch) (push (lex-num code) tokens))
-                ((member ch '(#\Tab #\Space)) (loop while (and (peek code)
-                                                               (member (peek code) str:*whitespaces*))
-                                                    do (read-char code nil nil)))
-    ;             (setf tokens (cons (list :whitespace " ") tokens)))
-                ((eql ch #\:) (push (lex-assign code) tokens))
-                ((eql ch #\=) (push (lex-equal code) tokens))
-                ((eql ch #\Newline) (incf curr-line) (read-char code nil nil) (push (list :newline "\n") tokens))
-                ((eql ch #\;) (read-char code nil nil) (push (list :semicolon ";") tokens))
-                ((eql ch #\<) (push (lex-less-angle code) tokens))
-                ((eql ch #\") (push (lex-string code #\") tokens))
-                ((eql ch #\') (push (lex-string code #\') tokens))
-                ((eql ch #\/) (push (lex-slash code) tokens))
-                ((eql ch #\() (push (lex-open-paren code) tokens))
-                ((eql ch #\>) (push (lex-greater-angle code) tokens))
-                ((eql ch #\+) (read-char code nil nil) (push (list :op "+") tokens))
-                (t (read-char code nil nil)))))
+    (loop for token = (lex-next-token lexer)
+          while token
+          do (push token tokens))
     (nreverse tokens)))
-
-(defun lex-slash (code)
-  "Lex a forward slash which can be the beginning of a double
-   slash which is a comment, or a division if a single slash"
-  (read-char code nil nil)
-  (if (eql (peek code) #\/)
-      (progn
-        (loop while (and (peek code) (not (eql (peek code) #\Newline))) do
-            (read-char code nil nil))
-        (read-char code nil nil)
-        (list :comment ""))
-      (list :division "/")))
-
-(defun lex-open-paren (code)
-  "Lex an open paren. If followed by asterisk, it is a block comment."
-  (read-char code nil nil)
-  (if (eql (peek code) #\*)
-      (lex-block-comment code)
-      (list :open-paren "(")))
-
-(defun lex-block-comment (code)
-  "An open paren followed by asterisk is a block comment."
-  (read-char code nil nil)
-  (let ((last-peek nil))
-    (loop while (peek code) do
-      (if (and (eql last-peek #\*)
-               (eql (peek code) #\)))
-          (progn
-            (read-char code nil nil)
-            (return (list :block-comment "")))
-          (setf last-peek (read-char code nil nil))))))
-
-(defun lex-string (code delim)
-  "Lex a string, which is text inside of single or double quotes (#\' or #\")"
-  (read-char code nil nil)
-  (let ((fstr (make-array '(0) :element-type 'base-char :fill-pointer 0 :adjustable t)))
-    (with-output-to-string (s fstr)
-    (loop while (not (eql (peek code) delim))
-          do (princ (read-char code nil nil) s))
-    (read-char code nil nil)
-    (list :string fstr))))
-
-(defun lex-assign (code)
-  "Lex an assignment, which is a colon followed by equal sign :="
-  (read-char code nil nil)
-  (let ((next (peek code)))
-    (cond
-      ((eql next #\=) (read-char code nil nil) (list :assign ":="))
-      (t (list :undefined ":")))))
-
-(defun lex-equal (code)
-  "Lex an equal sign, which is used for comparison"
-  (read-char code nil nil)
-  (list :comparison "="))
-
-(defun lex-less-angle (code)
-  "Lex a left angle, which can either be less than (<), less than or equal to (<=),
-   or not equal to (<>)."
-  (read-char code nil nil)
-  (let ((next (peek code)))
-    (cond
-      ((eql next #\=) (read-char code nil nil) (list :less-equal "<="))
-      ((eql next #\>) (read-char code nil nil) (list :not-equal "<>"))
-      (t (list :less-than "<")))))
-
-(defun lex-greater-angle (code)
-  "Lex a right angle, which can be greater than (>) or greater than or equal to (>=)"
-  (read-char code nil nil)
-  (let ((next (peek code)))
-    (cond
-      ((eql next #\=) (read-char code nil nil) (list :greater-equal ">="))
-      (t (list :greater ">")))))
-
-
-(defun lex-ident (code)
-  "Lex an identifier, which is a stream of alphanumeric characters and/or underscores,
-   but must start with an alpha character."
-  (let* ((tmp (lex-token code :token-key :ident :stop-pred #'(lambda (x) (or (alpha-char-p x) (eql x #\_)))))
-         (ident-str (str:downcase tmp))
-         (is-reserved (gethash ident-str *reserved-table*)))
-    (if is-reserved
-        (list is-reserved tmp)
-        (list :ident tmp))))
-
-
-(defun lex-num (code)
-  "Lex a number, which is a collection of digits, which may have a decimal (.),
-   making it a real"
-  (let ((fstr (make-array '(0) :element-type 'base-char :fill-pointer 0 :adjustable t))
-        (is-real nil))
-    (with-output-to-string (s fstr)
-      (princ (glob-digits code) s)
-      (if (eql #\. (peek code))
-          (progn
-            (princ (read-char code nil nil) s)
-            (princ (glob-digits code) s)
-            (setf is-real t))))
-    (if is-real (list :real fstr) (list :int fstr))))
-
-
-(defun glob-digits (code)
-  (loop while (and (peek code) (digit-char-p (peek code)))
-        collect (read-char code nil nil) into ret
-        finally (return (coerce ret 'string))))
-
-
-(defun lex-token (st &key token-key stop-pred)
-  (loop for ch = (peek st)
-        until (not (and ch (funcall stop-pred ch)))
-        collect (read-char st nil nil) into res
-        finally (return (coerce res 'string))))
-
-
-(defun peek (strm)
-  (peek-char nil strm nil nil))
