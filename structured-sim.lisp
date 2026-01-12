@@ -22,13 +22,13 @@
 
 (defun on-about (body)
   (clog-web-initialize body)
-  (add-class body +background+)
+  (setf (style body "background-color") +light-blue+)
   (let* ((menu (create-web-menu-bar body))
          (sim (create-web-menu-item menu :content "Simulator" :link "/"))
          (about (create-web-menu-item menu :content "About Me" :link "/about"))
-         (_div (create-div body :class (format nil "~A ~A" "w3-panel" +foreground+)
-                     :style +flex-col+
-                     :content (spinneret:with-html-string (:h1 "About Me"))))
+         (_div (create-div body :class "w3-panel"
+                     :style (styles +flex-col+ (back-color +grey+))
+                     :content (spinneret:with-html-string (:h1 :style (fore-color +light-blue+) "About Me"))))
          (about-div (create-div body :style "display:flex;flex-direction:column;width:80%;align-items:center;")))
     (create-div about-div :style "align-items:left;width:90%;"
                           :content (spinneret:with-html-string
