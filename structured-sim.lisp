@@ -7,6 +7,7 @@
 (defparameter +foregound-border+ "w3-border-light-blue")
 (defparameter +light-blue+ "#DCE2F0")
 (defparameter +grey+ "#50586C")
+(defparameter *tags* (make-hash-table :test #'equal))
 
 (defun add-semicolon (s)
   (format nil "~A~A" s (if (str:ends-with? ";" s) "" ";")))
@@ -44,7 +45,7 @@
   (let* ((menu (create-web-menu-bar body))
          (sim (create-web-menu-item menu :content "Simulator" :link "/"))
          (about (create-web-menu-item menu :content "About Me" :link "/about"))
-
+         (env-hash (make-hash-table))
          (running nil)
          (tags nil)
          (stopped t)
@@ -95,9 +96,6 @@
 
                   (div (:bind editor-d :style (styles +flex-col+ "flex:1;width:50%;height:100%;")))
 
-                     ;  (div (:style (styles "gap:10px;" +flex-row+))
-                      ;      (button (:bind stop-button :style "background-color:orange;" :content "Stop"))
-                       ;     (button (:bind run-button :style "background-color:#ccc;" :content "Run"))))
                   (div (:style (styles +flex-col+ "height:100%;margin-left:auto;"))
                        (div (:style (styles +flex-row+ "gap:10px;width:100%;margin-left:3px;"))
                             (button (:bind stop-button
@@ -110,45 +108,50 @@
              (div (:style "height:10vh")))
 
 
-      (flet ((start-running (obj)
+      (flet ((lookup-tag (tag-name)
+               ())
+             (start-running (obj)
                (when stopped
                  (setf (background-color stop-button) "#ccc")
                  (setf (background-color run-button) "green")
                  (setf stopped nil)
                  (print-to-debug debug-text-area "Simulation Started")
-                 (format t "~A~%" (tokenize (js-query body "window.clogEditor.getValue()")))))
+                 (let* ((tokens (tokenize (js-query body "window.clogEditor.getValue()")))
+                        (parser (make-parser tokens)))
+                   (labels ((clog-ast (ast)
+                              (cond
+                                ((numberp ast) ast)
+                                ((listp ast)
+                                 (case (first ast)
+                                   (:assignment
+                                    (js-query body (format nil "document.getElementById('~A').textContent = '~A'" (second ast) (clog-ast (third ast)))))
+
+                                   (:add (apply #'+ (mapcar #'clog-ast (rest ast))))
+                                   (:sub (apply #'- (mapcar #'clog-ast (rest ast)))))))))
+                     (clog-ast (parse-statement parser))))))
              (stop-running (obj)
                (setf stopped t)
                (setf (background-color stop-button) "orange")
                (setf (background-color run-button) "#ccc")
                (print-to-debug debug-text-area "Simulation Stopped"))
+
              (add-tags (tag)
-             ;  (with-clog-create tablebody
                (cond
                  ((string= (second tag) "Bool")
-                  (create-string-tag tablebody :content tag))
+                  (setf (gethash (first tag) *tags*) (create-string-tag tablebody :content tag)))
                  ((string= (second tag) "Int")
-                  (create-string-tag tablebody :content tag))
+                  (setf (gethash (first tag) *tags*) (create-string-tag tablebody :content tag)))
                  ((string= (second tag) "Real")
-                  (create-string-tag tablebody :content tag))
+                  (setf (gethash (first tag) *tags*) (create-string-tag tablebody :content tag)))
                  ((string= (second tag) "String")
-                  (create-string-tag tablebody :content tag))
+                  (setf (gethash (first tag) *tags*) (create-string-tag tablebody :content tag)))
                  ((string= (second tag) "ArrayBool")
-                  (create-string-tag tablebody :content tag))
+                  (setf (gethash (first tag) *tags*) (create-string-tag tablebody :content tag)))
                  ((string= (second tag) "ArrayInt")
-                  (create-string-tag tablebody :content tag))
-                 ((string= (second tag) "ArrayInt")
-                  (create-string-tag tablebody :content tag))
+                  (setf (gethash (first tag) *tags*) (create-string-tag tablebody :content tag)))
+                 ((string= (second tag) "ArrayReal")
+                  (setf (gethash (first tag) *tags*) (create-string-tag tablebody :content tag)))
                  (t (error "Datatype Not Supported")))))
-                  ;(create-string-tag tablebody :content tag)))
-                   ;(table-row (:bind tag-row)
-                              ;(table-column (:content (first tag)))
-                              ;(table-column (:content (second tag)))
-                              ;(table-column (:content (third tag)))
-
-                             ; (table-column ()
-                             ;               (button (:bind del-button :content "delete"))))
-                ; (set-on-click del-button (lambda (x) (destroy tag-row))))))
         (loop for tag in vars do
               (add-tags tag))
         (disable-resize debug-text-area)
@@ -164,21 +167,9 @@
                                             ("Int" "0")
                                             ("Real" "0")
                                             ("String" "''")
-                                            ("Array" "[]")))))))
-                       ;   (with-clog-create tablebody
-                       ;       (table-row (:bind tag-row)
-                       ;                  (table-column (:content (value tag-name)))
-                       ;                  (table-column (:content (value type-select)))
-                       ;                  (table-column (:content (alexandria:switch ((value type-select) :test #'string=)
-                       ;                                            ("Bool" "False")
-                       ;                                            ("Int" "0")
-                       ;                                            ("Real" "0.0")
-                       ;                                            ("String" "''")
-                       ;                                            ("Array" "[]")
-                       ;                                            (t "Undefined"))))
-                       ;                  (table-column ()
-                       ;                                (button (:bind del-button :content "Delete"))))
-                       ;     (set-on-click del-button (lambda (x) (destroy tag-row)))))))
+                                            ("ArrayInt"  "[0 ,0 ,0 ,0 ,0 ,0 ,0 ,0 ,0]")
+                                            ("ArrayBool" "[0, 0, 0, 0, 0, 0, 0, 0, 0]")
+                                            ("ArrayReal" "[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]")))))))
                       (create-code-editor body editor-d code)))))
 
 
@@ -225,3 +216,4 @@
    (str:replace-all
     (string #\Newline) "\\n"
     (str:replace-all "\\" "\\\\" str))))
+

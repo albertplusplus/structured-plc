@@ -16,13 +16,16 @@
 
 
 (defmethod create-string-tag ((obj clog-obj) &key content)
+  (format t "HTML-ID: ~A" (first content))
   (let* ((new-row (create-table-row obj))
          (name-row (create-table-column new-row :content (first content)))
          (type-row (create-table-column new-row :content (second content)))
-         (value-row (create-table-column new-row :content (third content)))
+         (value-row (create-table-column new-row :content (third content) :html-id (first content)))
          (button-row (create-button (create-table-column new-row) :content "Delete")))
     (format t "~A~%" content)
-    (set-on-click button-row (lambda (x) (destroy new-row)))
+    (set-on-click button-row (lambda (x)
+                               (remhash (text-value name-row) *tags*)
+                               (destroy new-row)))
     (if (string= (second content) "Bool")
         (progn
           (setf (background-color value-row) "#ff4040")
@@ -40,8 +43,8 @@
   (:documentation "Update display for PLC tag"))
 
 (defmethod update-display ((string-tag string-datatype) new-value)
-  (let* ((cols (children string-tag))
-         (second-col (nth 2 cols)))
+  (let* ((cols (list-of-children string-tag))
+         (second-col (first cols)))
     (setf (text-value second-col) new-value)))
 
 (defun create-plc-tag (tablebody tag)

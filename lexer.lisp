@@ -70,10 +70,14 @@
                            ((string= text-upper "FOR") :for)
                            ((string= text-upper "TO") :to)
                            ((string= text-upper "BY") :by)
+                           ((string= text-upper "NOT") :not)
                            ((string= text-upper "TRUE") :true)
                            ((string= text-upper "FALSE") :false)
                            ((string= text-upper "CASE") :case)
                            ((string= text-upper "END_CASE") :end-case)
+                           ((string= text-upper "TON") :ton)
+                           ((string= text-upper "IN") :in)
+                           ((string= text-upper "PT") :pt)
                            (t :ident))))
       (make-token :type keyword-type
                   :value text
@@ -97,7 +101,8 @@
     (when (and (eql (peek-char-lexer lexer) #\.)
                (and (peek-next-char lexer) (digit-char-p (peek-next-char lexer))))
       (setf has-dot t)
-      (push (advance lexer) chars)
+      (push #\. chars)
+      (advance lexer)
       (loop for ch = (peek-char-lexer lexer)
             while (and ch (digit-char-p ch))
             do (progn
@@ -126,6 +131,8 @@
                 :value (coerce (nreverse chars) 'string)
                 :line start-line
                 :column start-col)))
+
+
 
 (defun lex-next-token (lexer)
   (skip-whitespace lexer)
@@ -187,6 +194,18 @@
       ((char= ch #\+)
        (advance lexer)
        (make-token-here lexer :op "+"))
+
+      ((char= ch #\-)
+       (advance lexer)
+       (make-token-here lexer :op "-"))
+
+      ((char= ch #\*)
+       (advance lexer)
+       (make-token-here lexer :op "*"))
+
+      ((char= ch #\<)
+       (advance lexer)
+       (make-token-here lexer :less-than "<"))
 
       (t
        (let ((tok (make-token-here lexer :undefined (string ch))))
